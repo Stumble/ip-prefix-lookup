@@ -10,6 +10,7 @@ using namespace std;
 
 typedef uint32_t IpAddr;
 typedef pair<uint32_t, uint32_t> Prefix;
+typedef pair<Prefix, IpAddr> FibEntry;
 
 uint32_t ipToInt(const string& prefix)
 {
@@ -75,6 +76,8 @@ std::ostream& operator<<(std::ostream& s, const Prefix& p)
     return s;
 }
 
+vector<FibEntry> g_fib;
+// 668507
 void parseLine(const string& line)
 {
     if (line[3] == ' ') {
@@ -97,11 +100,98 @@ void parseLine(const string& line)
         std::cerr << "skipped: " + line << std::endl;
     }
     std::cout << prefix << "    " << intToIp(dest) << "\n";
+    g_fib.emplace_back(prefix, dest);
     // std::cout << intToIp(dest) << std::endl;
+}
+
+
+class MultiBitTrie
+{
+public:
+
+class Node
+{
+public:
+    node(size_t nBit,
+         bool hasNextHop = false,
+         IpAddr nextHop = 0)
+        : m_hasNextHop(hasNextHop)
+        , m_nextHop(nextHop)
+    {
+        
+    }
+
+public:
+    bool m_hasNextHop;
+    IpAddr m_nextHop;
+    vector<Node*> m_next;
+};
+
+    MultiBitTrie(int nBit)
+        : m_nBit(nBit)
+    {
+        m_root = new node();
+    }
+
+    void insert(const Prefix& prefix, const IpAddr& dest)
+    {
+        Node* p = m_root;
+        uint32_t prefixBits = prefix.first;
+        int len = (prefix.second) / m_nBit;
+        if (prefix.second % m_bit != 0) len ++;
+        // two cases
+        // non-residule
+        // has residule
+        for (int i = 0; i < len; i++) {
+            int val = getValue(prefixBits, m_nBit);
+            if (p->getNextI(val) == nullptr) {
+                p->setNextI(val, new node());
+            }
+            p = p->getNextI(val);
+            prefixBits <<= m_nBit;
+        }
+    }
+
+    int m_nBit;
+    Node* m_root;
+};
+
+class Router
+{
+public:
+    Router()
+        : m_trie(1)
+    {};
+
+    // build the routing from fibs
+    void build(const vector<FibEntry>& fib) {
+        for (const FibEntry& entry : g_fib) {
+        }
+    }
+
+    // insert a single entry into table
+    void insert(const FibEntry& entry) {
+
+    }
+
+    IpAddr lookUp(const IpAddr& ip) {
+
+    }
+    MultiBitTrie m_trie;
+};
+
+
+
+
+{
+    
 }
 
 int main(int argc, char *argv[])
 {
+    std::cout << sizeof(long long) << std::endl;
+    std::cout << sizeof(uint8_t) << std::endl;
+    return 0;
     string line;
     while(getline(cin, line)) {
         if (cin.eof()) {
@@ -109,5 +199,6 @@ int main(int argc, char *argv[])
         }
         parseLine(line);
     }
+    build(g_fib);
     return 0;
 }
