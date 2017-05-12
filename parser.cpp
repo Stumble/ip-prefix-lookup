@@ -11,6 +11,7 @@ using namespace std;
 typedef uint32_t IpAddr;
 typedef pair<uint32_t, uint32_t> Prefix;
 typedef pair<Prefix, IpAddr> FibEntry;
+typedef uint32_t Block;
 
 uint32_t ipToInt(const string& prefix)
 {
@@ -109,47 +110,124 @@ class MultiBitTrie
 {
 public:
 
-class Node
-{
-public:
-    node(size_t nBit,
-         bool hasNextHop = false,
-         IpAddr nextHop = 0)
-        : m_hasNextHop(hasNextHop)
-        , m_nextHop(nextHop)
+    class Node
     {
-        
-    }
+    public:
+        Node(size_t nBit,
+             bool hasNextHop = false,
+             IpAddr nextHop = 0,
+             size_t nPartial = 0)
+            : m_hasNextHop(hasNextHop)
+            , m_nextHop(nextHop)
+            , m_next(1 << nBit)
+            , m_nPartial(0)
+        {
+            // the size of next[] is (1 << (nBit - 1)), i.e. 2^n
+            // if there is a dest, then how many bits there are valid,
+            // from left to right, is indicated in nPartial.
+            // this value is used when override entry
+            if (hasNextHop && nPartial == 0) {
+                m_nPartial = nBit;
+            } else {
+                m_nPartial = nPartial;
+            }
+        }
 
-public:
-    bool m_hasNextHop;
-    IpAddr m_nextHop;
-    vector<Node*> m_next;
-};
+        void
+        setNewNextHop(IpAddr nextHop, size_t nPartial)
+        {
+            if (m_hasNextHop && nPartial < m_nPartial) {
+                // if it's less than previous value, just ignore
+                return ;
+            }
+            m_hasNextHop = true;
+            m_nextHop = nextHop;
+            m_nPartial = nPartial;
+        }
+
+    public:
+        bool m_hasNextHop;
+        IpAddr m_nextHop;
+        vector<Node*> m_next;
+        size_t m_nPartial;
+    };
 
     MultiBitTrie(int nBit)
         : m_nBit(nBit)
     {
-        m_root = new node();
+        if (nBit == 0) {
+            throw std::runtime_error("nbit should be larger than 0");
+        }
+        m_root = new Node(nBit);
     }
 
     void insert(const Prefix& prefix, const IpAddr& dest)
     {
+        // one optimization is to store Ip reversely.....
         Node* p = m_root;
-        uint32_t prefixBits = prefix.first;
+        Block prefixBits = prefix.first;
+
+        // this is the len without counting the last component
         int len = (prefix.second) / m_nBit;
-        if (prefix.second % m_bit != 0) len ++;
-        // two cases
-        // non-residule
-        // has residule
+        // if (prefix.second % m_bit != 0) len ++;
+
         for (int i = 0; i < len; i++) {
-            int val = getValue(prefixBits, m_nBit);
-            if (p->getNextI(val) == nullptr) {
-                p->setNextI(val, new node());
+            Block val = getChunk(prefixBits, m_nBit);
+            if (p->m_next[val] == nullptr) {
+                p->m_next[val] = new Node(m_nBit);
             }
-            p = p->getNextI(val);
+            p = p->m_next[val];
             prefixBits <<= m_nBit;
         }
+        if (prefix.second % m_nBit != 0) {
+            int nRest = prefix.second % m_nBit;
+            Block rest = getChunk(prefixBits, nRest);
+            Block begin = rest << (m_nBit - nRest);
+            Block end = rest + (1 << (m_nBit - nRest)) - 1;
+            for (Block i = begin; i <= end; i++) {
+                p->setNewNextHop(dest, rest);
+            }
+        } else {
+            p->setNewNextHop(dest, m_nBit);
+        }
+    }
+
+    IpAddr lookUp(const IpAddr& ip) {
+        // this method and insert need to be updated to
+        // be able to be used 12-8-8-4, or whatever schema.
+        IpAddr dest = 0;
+        Node* p = m_root;
+        Block prefixBits = ip;
+        int len = 32 / m_nBit;
+        for (int i = 0; i < len; i++) {
+            Block val = getChunk(prefixBits, m_nBit);
+            if (p->m_next[val] == nullptr) {
+                return dest;
+            }
+            p = p->m_next[val];
+            prefixBits <<= m_nBit;
+            if (p->m_hasNextHop) {
+                dest = p->m_nextHop;
+            }
+        }
+        return dest;
+    }
+
+    Block
+    getChunk(Block ip, int nBits)
+    {
+        Block rtn = (1 << nBits) - 1;
+        return (ip & reverse(rtn)) >> (32 - m_nBit);
+    }
+
+    Block
+    reverse(Block x)
+    {
+        x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
+        x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
+        x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4));
+        x = (((x & 0xff00ff00) >> 8) | ((x & 0x00ff00ff) << 8));
+        return((x >> 16) | (x << 16));
     }
 
     int m_nBit;
@@ -166,6 +244,7 @@ public:
     // build the routing from fibs
     void build(const vector<FibEntry>& fib) {
         for (const FibEntry& entry : g_fib) {
+            m_trie.insert(entry.first, entry.second);
         }
     }
 
@@ -175,23 +254,15 @@ public:
     }
 
     IpAddr lookUp(const IpAddr& ip) {
-
+        return m_trie.lookUp(ip);
     }
     MultiBitTrie m_trie;
 };
 
 
-
-
-{
-    
-}
-
+// we assume that there is no same prefix that has different nexthop
 int main(int argc, char *argv[])
 {
-    std::cout << sizeof(long long) << std::endl;
-    std::cout << sizeof(uint8_t) << std::endl;
-    return 0;
     string line;
     while(getline(cin, line)) {
         if (cin.eof()) {
@@ -199,6 +270,12 @@ int main(int argc, char *argv[])
         }
         parseLine(line);
     }
-    build(g_fib);
+    Router router;
+    router.build(g_fib);
+    IpAddr ip = 0x0100F800;
+    for (int i = 0; i <= 100; i++) {
+        ip++;
+        std::cout << intToIp(router.lookUp(ip)) << std::endl;
+    }
     return 0;
 }
