@@ -1,3 +1,5 @@
+// -lboost_timer
+
 #include <iostream>
 #include <cstdio>
 #include <sstream>
@@ -5,6 +7,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/assert.hpp>
+#include <boost/timer/timer.hpp>
 
 using namespace std;
 
@@ -192,7 +195,9 @@ public:
         }
     }
 
-    IpAddr lookUp(const IpAddr& ip) {
+    IpAddr
+    lookUp(const IpAddr& ip) const
+    {
         // this method and insert need to be updated to
         // be able to be used 12-8-8-4, or whatever schema.
         IpAddr dest = 0;
@@ -214,14 +219,14 @@ public:
     }
 
     Block
-    getChunk(Block ip, int nBits)
+    getChunk(Block ip, int nBits) const
     {
         Block rtn = (1 << nBits) - 1;
         return (ip & reverse(rtn)) >> (32 - m_nBit);
     }
 
     Block
-    reverse(Block x)
+    reverse(Block x) const
     {
         x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
         x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
@@ -253,12 +258,23 @@ public:
 
     }
 
-    IpAddr lookUp(const IpAddr& ip) {
+    IpAddr lookUp(const IpAddr& ip) const
+    {
         return m_trie.lookUp(ip);
     }
+
     MultiBitTrie m_trie;
 };
 
+void test(const Router& router)
+{
+    boost::timer::auto_cpu_timer t;
+    IpAddr ip = 0x0100F800;
+    for (int i = 0; i <= 100000; i++) {
+        ip++;
+        // std::cout << router.lookUp(ip) << std::endl;
+    }
+}
 
 // we assume that there is no same prefix that has different nexthop
 int main(int argc, char *argv[])
@@ -272,10 +288,6 @@ int main(int argc, char *argv[])
     }
     Router router;
     router.build(g_fib);
-    IpAddr ip = 0x0100F800;
-    for (int i = 0; i <= 100; i++) {
-        ip++;
-        std::cout << intToIp(router.lookUp(ip)) << std::endl;
-    }
+    test(router);
     return 0;
 }
