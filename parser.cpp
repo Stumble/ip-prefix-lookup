@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cstdio>
 #include <sstream>
+#include <fstream>
 #include <vector>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
@@ -276,10 +277,19 @@ public:
 void test(const Router& router)
 {
     boost::timer::auto_cpu_timer t;
-    IpAddr ip = 0x0100F800;
-    for (int i = 0; i <= 100000; i++) {
-        ip++;
-        std::cout << router.lookUp(ip) << "\n";
+    ifstream fin("MillionIPAddrOutput.txt");
+    ofstream fout("TestOutput.txt");
+    vector<IpAddr> ips;
+    string ip;
+    while (!fin.eof()) {
+        fin >> ip;
+        ips.push_back(ipToInt(ip));
+    }
+    for (size_t i = 0; i < ips.size(); ++i) {
+        IpAddr rst = router.lookUp(ips[i]);
+        if (i < 100) {
+            fout << intToIp(rst) << "\n";
+        }
     }
 }
 
