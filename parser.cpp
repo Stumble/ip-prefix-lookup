@@ -16,7 +16,7 @@ typedef pair<uint32_t, uint32_t> Prefix;
 typedef pair<Prefix, IpAddr> FibEntry;
 typedef uint32_t Block;
 
-uint32_t ipToInt(const string& prefix)
+IpAddr ipToInt(const string& prefix)
 {
     vector<string> numbers;
     boost::split(numbers, prefix, boost::is_any_of("."));
@@ -27,19 +27,13 @@ uint32_t ipToInt(const string& prefix)
     uint32_t weight = 1;
     weight <<= 24;
     for (int i = 0; i < 4; i++) {
-        // try {
-        //     sum += (boost::lexical_cast<uint32_t>(numbers[i]) * weight);
-        // } catch (std::exception e) {
-        //     std::cout << "wrong prefix:" << prefix << std::endl;
-        //     std::cout << e.what() << std::endl;
-        // }
         sum += (boost::lexical_cast<uint32_t>(numbers[i]) * weight);
         weight >>= 8;
     }
     return sum;
 }
 
-string intToIp(uint32_t ip)
+string intToIp(IpAddr ip)
 {
     string ans;
     uint32_t weight = (1 << 24);
@@ -100,12 +94,10 @@ void parseLine(const string& line)
         prefix = getPrefix(prefixStr);
         dest = ipToInt(destIpStr);
     } catch (std::runtime_error err) {
-        std::cerr << err.what() << std::endl;
-        std::cerr << "skipped: " + line << std::endl;
+        std::cerr << err.what() << "\n";
+        std::cerr << "skipped: " + line << "\n";
     }
-    // std::cout << prefix << "    " << intToIp(dest) << "\n";
     g_fib.emplace_back(prefix, dest);
-    // std::cout << intToIp(dest) << std::endl;
 }
 
 
@@ -260,23 +252,20 @@ public:
 class Router
 {
 public:
-    Router()
-        : m_trie(vector<int>(32, 1))
+    Router(vector<int> strops = vector<int>(32, 1))
+        : m_trie(strops)
     {};
 
     // build the routing from fibs
-    void build(const vector<FibEntry>& fib) {
+    void
+    build(const vector<FibEntry>& fib) {
         for (const FibEntry& entry : g_fib) {
             m_trie.insert(entry.first, entry.second);
         }
     }
 
-    // insert a single entry into table
-    void insert(const FibEntry& entry) {
-
-    }
-
-    IpAddr lookUp(const IpAddr& ip) const
+    IpAddr
+    lookUp(const IpAddr& ip) const
     {
         return m_trie.lookUp(ip);
     }
@@ -290,7 +279,7 @@ void test(const Router& router)
     IpAddr ip = 0x0100F800;
     for (int i = 0; i <= 100000; i++) {
         ip++;
-        std::cout << router.lookUp(ip) << std::endl;
+        std::cout << router.lookUp(ip) << "\n";
     }
 }
 
