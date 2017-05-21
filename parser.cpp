@@ -103,7 +103,7 @@ void parseLine(const string& line)
         std::cerr << err.what() << std::endl;
         std::cerr << "skipped: " + line << std::endl;
     }
-    std::cout << prefix << "    " << intToIp(dest) << "\n";
+    // std::cout << prefix << "    " << intToIp(dest) << "\n";
     g_fib.emplace_back(prefix, dest);
     // std::cout << intToIp(dest) << std::endl;
 }
@@ -155,13 +155,20 @@ public:
         size_t m_nPartial;
     };
 
-    MultiBitTrie(int nBit)
-        : m_nBit(nBit)
+    MultiBitTrie(vector<int> strops)
+        : m_strops(strops)
     {
-        if (nBit == 0) {
-            throw std::runtime_error("nbit should be larger than 0");
+        int sum = 0;
+        for (const int& val : strops) {
+            if (val <= 0) {
+                throw std::runtime_error("strop length must be larger than 0");
+            }
+            sum += val;
         }
-        m_root = new Node(nBit);
+        if (sum != 32) {
+            throw std::runtime_error("sum of strops is not equal to 32");
+        }
+        m_root = new Node(strops.front());
     }
 
     void insert(const Prefix& prefix, const IpAddr& dest)
@@ -169,48 +176,59 @@ public:
         // one optimization is to store Ip reversely.....
         Node* p = m_root;
         Block prefixBits = prefix.first;
+        int prefixLength = prefix.second;
 
-        // this is the len without counting the last component
-        int len = (prefix.second) / m_nBit;
-        // if (prefix.second % m_bit != 0) len ++;
-
-        for (int i = 0; i < len; i++) {
-            Block val = getChunk(prefixBits, m_nBit);
-            if (p->m_next[val] == nullptr) {
-                p->m_next[val] = new Node(m_nBit);
+        int processedLength = 0;
+        int currentStrop = 0;
+        for (size_t i = 0; i < m_strops.size(); i++) {
+            // if the last part is less than the next strop
+            // break to last part process
+            currentStrop = m_strops[i];
+            if (processedLength + currentStrop > prefixLength) {
+                break;
             }
+
+            Block val = getChunk(prefixBits, currentStrop);
+            if (p->m_next[val] == nullptr) {
+                p->m_next[val] = new Node(currentStrop);
+            }
+
+            processedLength += currentStrop;
             p = p->m_next[val];
-            prefixBits <<= m_nBit;
+            prefixBits <<= currentStrop;
         }
-        if (prefix.second % m_nBit != 0) {
-            int nRest = prefix.second % m_nBit;
+
+        if (processedLength < prefixLength) {
+            int nRest = prefixLength - processedLength;
             Block rest = getChunk(prefixBits, nRest);
-            Block begin = rest << (m_nBit - nRest);
-            Block end = rest + (1 << (m_nBit - nRest)) - 1;
+            Block begin = rest << (currentStrop - nRest);
+            Block end = rest + (1 << (currentStrop - nRest)) - 1;
             for (Block i = begin; i <= end; i++) {
-                p->setNewNextHop(dest, rest);
+                if (p->m_next[i] == nullptr) {
+                    p->m_next[i] = new Node(currentStrop);
+                }
+                p->m_next[i]->setNewNextHop(dest, rest);
             }
         } else {
-            p->setNewNextHop(dest, m_nBit);
+            p->setNewNextHop(dest, currentStrop);
         }
     }
 
     IpAddr
     lookUp(const IpAddr& ip) const
     {
-        // this method and insert need to be updated to
-        // be able to be used 12-8-8-4, or whatever schema.
         IpAddr dest = 0;
         Node* p = m_root;
         Block prefixBits = ip;
-        int len = 32 / m_nBit;
-        for (int i = 0; i < len; i++) {
-            Block val = getChunk(prefixBits, m_nBit);
+        int currentStrop = 0;
+        for (size_t i = 0; i < m_strops.size(); i++) {
+            currentStrop = m_strops[i];
+            Block val = getChunk(prefixBits, currentStrop);
             if (p->m_next[val] == nullptr) {
                 return dest;
             }
             p = p->m_next[val];
-            prefixBits <<= m_nBit;
+            prefixBits <<= currentStrop;
             if (p->m_hasNextHop) {
                 dest = p->m_nextHop;
             }
@@ -222,7 +240,7 @@ public:
     getChunk(Block ip, int nBits) const
     {
         Block rtn = (1 << nBits) - 1;
-        return (ip & reverse(rtn)) >> (32 - m_nBit);
+        return (ip & reverse(rtn)) >> (32 - nBits);
     }
 
     Block
@@ -235,7 +253,7 @@ public:
         return((x >> 16) | (x << 16));
     }
 
-    int m_nBit;
+    vector<int> m_strops;
     Node* m_root;
 };
 
@@ -243,7 +261,7 @@ class Router
 {
 public:
     Router()
-        : m_trie(1)
+        : m_trie(vector<int>(32, 1))
     {};
 
     // build the routing from fibs
@@ -272,7 +290,7 @@ void test(const Router& router)
     IpAddr ip = 0x0100F800;
     for (int i = 0; i <= 100000; i++) {
         ip++;
-        // std::cout << router.lookUp(ip) << std::endl;
+        std::cout << router.lookUp(ip) << std::endl;
     }
 }
 
