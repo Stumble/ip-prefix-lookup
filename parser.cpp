@@ -95,8 +95,8 @@ void parseLine(const string& line)
         prefix = getPrefix(prefixStr);
         dest = ipToInt(destIpStr);
     } catch (std::runtime_error err) {
-        std::cerr << err.what() << "\n";
-        std::cerr << "skipped: " + line << "\n";
+        // std::cerr << err.what() << "\n";
+        // std::cerr << "skipped: " + line << "\n";
     }
     g_fib.emplace_back(prefix, dest);
 }
@@ -173,17 +173,24 @@ public:
 
         int processedLength = 0;
         int currentStrop = 0;
+        int nextStrop = 0;
         for (size_t i = 0; i < m_strops.size(); i++) {
             // if the last part is less than the next strop
             // break to last part process
             currentStrop = m_strops[i];
+            if (i == m_strops.size() - 1) {
+                nextStrop = 0;
+            } else {
+                nextStrop = m_strops[i + 1];
+            }
+
             if (processedLength + currentStrop > prefixLength) {
                 break;
             }
 
             Block val = getChunk(prefixBits, currentStrop);
             if (p->m_next[val] == nullptr) {
-                p->m_next[val] = new Node(currentStrop);
+                p->m_next[val] = new Node(nextStrop);
             }
 
             processedLength += currentStrop;
@@ -198,7 +205,7 @@ public:
             Block end = rest + (1 << (currentStrop - nRest)) - 1;
             for (Block i = begin; i <= end; i++) {
                 if (p->m_next[i] == nullptr) {
-                    p->m_next[i] = new Node(currentStrop);
+                    p->m_next[i] = new Node(nextStrop);
                 }
                 p->m_next[i]->setNewNextHop(dest, rest);
             }
@@ -303,8 +310,10 @@ int main(int argc, char *argv[])
         }
         parseLine(line);
     }
-    Router router;
+    Router router(vector<int>(32, 1));
+    std::cerr << "start building" << std::endl;
     router.build(g_fib);
+    std::cerr << "start testing" << std::endl;
     test(router);
     return 0;
 }
