@@ -271,23 +271,29 @@ public:
     MultiBitTrie m_trie;
 };
 
-void test(const Router& router)
+void runMillionTest(const Router& router,
+                    const vector<IpAddr> ips)
 {
     boost::timer::auto_cpu_timer t;
-    ifstream fin("MillionIPAddrOutput.txt");
-    ofstream fout("TestOutput.txt");
-    vector<IpAddr> ips;
-    string ip;
-    while (!fin.eof()) {
-        fin >> ip;
-        ips.push_back(ipToInt(ip));
-    }
+    ofstream fout("TestOutput-Million.txt");
     for (size_t i = 0; i < ips.size(); ++i) {
         IpAddr rst = router.lookUp(ips[i]);
         if (i < 100) {
             fout << intToIp(rst) << "\n";
         }
     }
+}
+
+void test(const Router& router)
+{
+    ifstream fin("MillionIPAddrOutput.txt");
+    vector<IpAddr> ips;
+    string ip;
+    while (!fin.eof()) {
+        fin >> ip;
+        ips.push_back(ipToInt(ip));
+    }
+    runMillionTest(router, ips);
 }
 
 // we assume that there is no same prefix that has different nexthop
