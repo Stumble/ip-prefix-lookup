@@ -303,9 +303,10 @@ void test(const Router& router)
 // we assume that there is no same prefix that has different nexthop
 int main(int argc, char *argv[])
 {
+    ifstream bgpFin("bgptable.txt");
     string line;
-    while(getline(cin, line)) {
-        if (cin.eof()) {
+    while(getline(bgpFin, line)) {
+        if (bgpFin.eof()) {
             break;
         }
         parseLine(line);
