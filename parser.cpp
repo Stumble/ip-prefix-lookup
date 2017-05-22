@@ -5,6 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
+#include <bitset>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/assert.hpp>
@@ -202,7 +203,7 @@ public:
             int nRest = prefixLength - processedLength;
             Block rest = getChunk(prefixBits, nRest);
             Block begin = rest << (currentStrop - nRest);
-            Block end = rest + (1 << (currentStrop - nRest)) - 1;
+            Block end = begin + (1 << (currentStrop - nRest)) - 1;
             for (Block i = begin; i <= end; i++) {
                 if (p->m_next[i] == nullptr) {
                     p->m_next[i] = new Node(nextStrop);
@@ -239,18 +240,7 @@ public:
     Block
     getChunk(Block ip, int nBits) const
     {
-        Block rtn = (1 << nBits) - 1;
-        return (ip & reverse(rtn)) >> (32 - nBits);
-    }
-
-    Block
-    reverse(Block x) const
-    {
-        x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
-        x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
-        x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4));
-        x = (((x & 0xff00ff00) >> 8) | ((x & 0x00ff00ff) << 8));
-        return((x >> 16) | (x << 16));
+        return ip >> (32 - nBits);
     }
 
     vector<int> m_strops;
@@ -311,7 +301,7 @@ int main(int argc, char *argv[])
         }
         parseLine(line);
     }
-    Router router(vector<int>(32, 1));
+    Router router({12, 8, 8, 4});
     std::cerr << "start building" << std::endl;
     router.build(g_fib);
     std::cerr << "start testing" << std::endl;
