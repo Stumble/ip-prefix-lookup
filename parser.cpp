@@ -286,6 +286,7 @@ void runMillionTest(const Router& router,
 
 void test(const Router& router)
 {
+    std::cerr << "reading the Input files" << std::endl;
     ifstream fin("MillionIPAddrOutput.txt");
     vector<IpAddr> ips;
     string ip;
@@ -293,6 +294,8 @@ void test(const Router& router)
         fin >> ip;
         ips.push_back(ipToInt(ip));
     }
+
+    std::cerr << "start to run the tests"<< std::endl;
     runMillionTest(router, ips);
 }
 
@@ -307,7 +310,31 @@ int main(int argc, char *argv[])
         }
         parseLine(line);
     }
-    Router router({12, 8, 8, 4});
+
+    ifstream layoutConfig("layout.conf");
+    vector<int> layout;
+    // if height is zero, then next two inputs(a,b) means a "b"s
+    int height = 0;
+    layoutConfig >> height;
+    if (height == 0) {
+        int n,len;
+        layoutConfig >> n >> len;
+        layout = vector<int>(n, len);
+    } else {
+        for (int i = 0; i < height; i++) {
+            int n;
+            layoutConfig >> n;
+            layout.push_back(n);
+        }
+    }
+
+    std::cout << "memory layout:"<< std::endl;
+    for (auto i : layout) {
+        cerr << i << " ";
+    }
+    std::cout << std::endl;
+
+    Router router(layout);
     std::cerr << "start building" << std::endl;
     router.build(g_fib);
     std::cerr << "start testing" << std::endl;
