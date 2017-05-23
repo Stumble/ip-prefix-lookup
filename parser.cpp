@@ -1,4 +1,5 @@
-// -lboost_timer
+// Compile command: g++  -Wall -Wconversion -O2 parser.cpp -lm -o parser -lboost_timer
+// $ /usr/bin/time -v ./parser
 
 #include <iostream>
 #include <cstdio>
